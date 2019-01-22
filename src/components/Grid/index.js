@@ -1,68 +1,143 @@
 import React from "react";
 import _ from "lodash";
 import RGL, { WidthProvider } from "react-grid-layout";
+import './grid.css';
 
 const ReactGridLayout = WidthProvider(RGL);
+
+const totalItems = [1,2,3,4];
 
 class BasicLayout extends React.PureComponent {
   static defaultProps = {
     className: "layout",
-    items: 20,
-    rowHeight: 30,
-    onLayoutChange: function() {},
-    cols: 12
+    cols: 6
   };
 
   constructor(props) {
     super(props);
 
-    const layout = this.generateLayout();
-    this.state = { layout };
+    this.state = {
+      items: {},
+      newCounter: totalItems.length
+    };
+
+    this.onAddItem = this.onAddItem.bind(this);
   }
 
-  generateDOM() {
-    return _.map(_.range(this.props.items), function(i) {
-      return (
-        <div key={i}>
+  componentDidMount() {
+    localStorage.length === 0 ?
+    this.setState({
+      items: totalItems.map(function(i, key, list) {
+        return {
+          i: i.toString(),
+          x: i * 2,
+          y: 0,
+          w: 1,
+          h: 1,
+          add: i === (list.length - 1).toString()
+        };
+      })
+    }) : this.setState({
+      items: getFromLS('rgl', 'layout')
+    })
+  }
+
+  createElement(el) {
+    const removeStyle = {
+      position: "absolute",
+      right: "2px",
+      top: 0,
+      cursor: "pointer"
+    };
+    const i = el.add ? "+" : el.i;
+    return (
+      <div key={i} data-grid={el}>
+        {el.add ? (
+          <span
+            className="add text"
+            onClick={this.onAddItem}
+            title="You can add an item by clicking here, too."
+          >
+            Add +
+          </span>
+        ) : (
           <span className="text">{i}</span>
-        </div>
-      );
-    });
+        )}
+        <span
+          className="remove"
+          style={removeStyle}
+          onClick={this.onRemoveItem.bind(this, i)}
+        >
+          x
+        </span>
+      </div>
+    );
   }
 
-  generateLayout() {
-    const p = this.props;
-    return _.map(new Array(p.items), function(item, i) {
-      const y = _.result(p, "y") || Math.ceil(Math.random() * 4) + 1;
-      return {
-        x: (i * 2) % 12,
-        y: Math.floor(i / 6) * y,
-        w: 2,
-        h: y,
-        i: i.toString()
-      };
-    });
+  onRemoveItem(i) {
+    console.log("removing", i);
+    this.setState({ items: _.reject(this.state.items, { i: i }) });
   }
 
-  onLayoutChange(layout) {
-    this.props.onLayoutChange(layout);
+  onAddItem() {
+    const newCounterState = this.state.newCounter + 1;
+    this.setState({
+      items: this.state.items.concat({
+        i: `${newCounterState}`,
+        x: (this.state.items.length*2) % (this.state.cols ||12),
+        y: Infinity,
+        w: 1,
+        h: 1
+      }),
+      newCounter: newCounterState
+    })
+  }
+
+  onLayoutChange = (layout) => {
+    this.setState({
+      items: layout
+    })
+    saveToLS('layout',layout)
   }
 
   render() {
+    const generatedLayout = this.state.items;
     return (
-      <ReactGridLayout
-        layout={this.state.layout}
-        onLayoutChange={this.onLayoutChange}
-        {...this.props}
-      >
-        {this.generateDOM()}
-      </ReactGridLayout>
+      <React.Fragment>
+        <button onClick={this.onAddItem}>Add</button>
+        <ReactGridLayout
+          layout={this.state.layout}
+          onLayoutChange={this.onLayoutChange}
+          {...this.props}
+        >
+        {_.map(generatedLayout, el => this.createElement(el))}
+        </ReactGridLayout>
+      </React.Fragment>
     );
   }
 }
 
-export default BasicLayout;
-
-if (require.main === module) {
-  require("../test-hook.jsx")(module.exports);
+//save layout to local storage
+function saveToLS(key, value) {
+  localStorage.setItem(
+    "rgl",
+    JSON.stringify({
+      [key]: value
+    })
+  )
 }
+
+//get layout from local storage
+function getFromLS(key, prop) {
+  let ls = {};
+  if(localStorage) {
+    try {
+      ls = JSON.parse(localStorage.getItem(key)) || {};
+    } catch(e) {
+
+    }
+  }
+  return ls[prop]
+}
+
+export default BasicLayout;
